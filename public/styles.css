@@ -271,8 +271,10 @@ tfoot td {
   .filters-grid.collapsed { display: none; }
   .topbar { padding: 12px 14px; }
   .form-grid { grid-template-columns: 1fr; }
+  .legend-grid { grid-template-columns: 1fr 1fr; }
 }
 @media (max-width: 520px) {
   .kpis { grid-template-columns: 1fr; }
   .app-shell { padding: 10px; }
+  .legend-grid { grid-template-columns: 1fr; }
 }
