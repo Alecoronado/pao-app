@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>PAO - Seguimiento de Proyectos</title>
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<div class="app-shell">
+
+  <header class="topbar">
+    <div>
+      <h1>PAO &middot; Seguimiento de Proyectos</h1>
+      <div class="subtitle" id="subtitleReport">Cargando...</div>
+    </div>
+    <div class="topbar-right">
+      <div class="user-pill">
+        &#128100;
+        <select id="userSelect"></select>
+        <span class="role-badge" id="roleBadge">-</span>
+      </div>
+      <button class="btn btn-outline" id="usersBtn" style="display:none">Usuarios</button>
+      <button class="btn btn-primary" id="newProjectBtn" style="display:none">+ Nuevo proyecto</button>
+    </div>
+  </header>
+
+  <section class="kpis">
+    <div class="kpi-card">
+      <div class="kpi-label">Proyectos</div>
+      <div class="kpi-value" id="kpiTotal">-</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Monto Pipeline (M USD)</div>
+      <div class="kpi-value" id="kpiPipeline">-</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Monto Aprobado (M USD)</div>
+      <div class="kpi-value" id="kpiAprobado">-</div>
+    </div>
+  </section>
+
+  <section class="filters-bar">
+    <button class="filters-toggle" id="filtersToggle">&#9776; Filtros</button>
+    <div class="filters-grid" id="filtersGrid">
+      <div class="filter-field">
+        <label>Buscar</label>
+        <input type="text" id="fSearch" placeholder="Apodo o codigo..." />
+      </div>
+      <div class="filter-field">
+        <label>Garantia</label>
+        <select id="fGarantia"><option value="">Todas</option></select>
+      </div>
+      <div class="filter-field">
+        <label>Estado</label>
+        <select id="fEstado"><option value="">Todas</option></select>
+      </div>
+      <div class="filter-field">
+        <label>Prioridad</label>
+        <select id="fPrioridad"><option value="">Todas</option></select>
+      </div>
+      <div class="filter-field">
+        <label>Probabilidad</label>
+        <select id="fProbabilidad"><option value="">Todas</option></select>
+      </div>
+      <div class="filter-field">
+        <label>Pais</label>
+        <div class="flags-row" id="fPaisFlags"></div>
+      </div>
+    </div>
+  </section>
+
+  <div class="table-wrap">
+    <table class="pao-table">
+      <thead>
+        <tr class="stage-group">
+          <th colspan="6"></th>
+          <th colspan="8">Etapas del Proceso</th>
+          <th colspan="5"></th>
+        </tr>
+        <tr>
+          <th class="col-left">Pais</th>
+          <th>Codigo</th>
+          <th class="col-left">Apodo / Proyecto</th>
+          <th>Estado</th>
+          <th>Prob.</th>
+          <th id="thGarantia">Garantia</th>
+          <th>ABS</th><th>PP-PR</th><th>PP-COP</th><th>PO-PR</th><th>VEC</th><th>PO-COP</th><th>NEG.</th><th>DEJ</th>
+          <th>Etapa Actual</th>
+          <th>Monto Pipeline</th>
+          <th>Aprobado</th>
+          <th>Fecha Aprobacion</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="tableBody"></tbody>
+      <tfoot>
+        <tr>
+          <td colspan="6" id="footTotal">TOTAL - 0 proyectos</td>
+          <td colspan="8"></td>
+          <td></td>
+          <td id="footPipeline">0</td>
+          <td id="footAprobado">0</td>
+          <td colspan="2"></td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+
+  <div class="cards-list" id="cardsList"></div>
+
+  <div class="empty-state" id="emptyState" style="display:none">No hay proyectos que coincidan con los filtros.</div>
+
+  <section class="legend-panel">
+    <strong>Referencias</strong>
+    <div class="legend-grid">
+      <div class="legend-item"><span class="stage-mark done">X</span> Etapa completada</div>
+      <div class="legend-item"><span class="stage-mark nc">N/C</span> No corresponde</div>
+      <div class="legend-item"><span class="stage-mark pending">&nbsp;&nbsp;</span> Etapa pendiente</div>
+      <div class="legend-item"><span class="prob-dot" style="background:#3C9E4E">A</span> Alta probabilidad</div>
+      <div class="legend-item"><span class="prob-dot" style="background:#E08A2C">B</span> Media probabilidad</div>
+      <div class="legend-item"><span class="prob-dot" style="background:#D3453A">C</span> Baja probabilidad</div>
+      <div class="legend-item">"Etapa Actual" = la siguiente etapa a completar (no la ultima tildada).</div>
+    </div>
+  </section>
+
+</div>
+
+<button class="fab" id="feedbackFab">&#9998; Solicitar cambio</button>
+
+<div id="modalRoot"></div>
+<div id="toastRoot"></div>
+
+<script src="app.js"></script>
+</body>
+</html>

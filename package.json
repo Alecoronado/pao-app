@@ -1,0 +1,23 @@
+{
+  "name": "pao-app",
+  "version": "1.0.0",
+  "description": "PAO - Seguimiento de Proyectos (CRM interno)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "seed": "node seed.js",
+    "test": "node test/api.test.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "pg": "^8.12.0",
+    "dotenv": "^16.4.5"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.2.13"
+  },
+  "license": "ISC"
+}
