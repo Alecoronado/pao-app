@@ -1,13 +1,44 @@
 require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const pool = require('./db');
 const { STAGES } = require('./db/stages');
-const { USERS, PROJECTS } = require('./db/seed-data');
+const { PROJECTS } = require('./db/seed-data');
+const { ROLES } = require('./db/roles');
+const { hashPassword } = require('./db/auth');
+
+function randomPassword() {
+  return crypto.randomBytes(9).toString('base64url'); // ~12 chars, legible
+}
+
+async function seedUsers() {
+  const generated = [];
+  for (const r of ROLES) {
+    const { rows } = await pool.query('SELECT id FROM users WHERE username = $1', [r.slug]);
+    if (rows.length > 0) continue; // ya existe, no se pisa la contraseña
+    const password = process.env[`INIT_PASSWORD_${r.slug.toUpperCase()}`] || randomPassword();
+    const password_hash = await hashPassword(password);
+    await pool.query(
+      'INSERT INTO users (username, password_hash, role) VALUES ($1,$2,$3)',
+      [r.slug, password_hash, r.slug]
+    );
+    generated.push({ username: r.slug, label: r.label, password });
+  }
+  if (generated.length) {
+    console.log('\nCuentas creadas (guardá estas contraseñas, no se vuelven a mostrar):');
+    generated.forEach((g) => console.log(`  ${g.label.padEnd(16)} usuario: ${g.username.padEnd(16)} contraseña: ${g.password}`));
+    console.log('');
+  } else {
+    console.log('Las 5 cuentas de rol ya existían, no se generaron contraseñas nuevas.');
+  }
+}
 
 async function run() {
   const schema = fs.readFileSync(path.join(__dirname, 'db', 'schema.sql'), 'utf8');
   await pool.exec(schema);
+
+  await seedUsers();
 
   const { rows: countRows } = await pool.query('SELECT COUNT(*)::int AS c FROM projects');
   if (countRows[0].c > 0 && process.env.FORCE_RESEED !== '1') {
@@ -18,14 +49,6 @@ async function run() {
   if (process.env.FORCE_RESEED === '1') {
     await pool.query('DELETE FROM project_history');
     await pool.query('DELETE FROM projects');
-  }
-
-  for (const u of USERS) {
-    await pool.query(
-      `INSERT INTO users (name, email, role) VALUES ($1,$2,$3)
-       ON CONFLICT (name) DO NOTHING`,
-      [u.name, u.email || null, u.role]
-    );
   }
 
   for (const p of PROJECTS) {
@@ -51,7 +74,7 @@ async function run() {
     await pool.query(`INSERT INTO projects (${cols.join(',')}) VALUES (${placeholders})`, vals);
   }
 
-  console.log(`Seed completo: ${USERS.length} usuarios, ${PROJECTS.length} proyectos.`);
+  console.log(`Seed completo: ${PROJECTS.length} proyectos.`);
 }
 
 run()

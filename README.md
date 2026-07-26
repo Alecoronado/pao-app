@@ -18,21 +18,23 @@ celular o en la compu, y los cambios quedan guardados para todos.
    usuario sin permiso de edicion) manden un pedido por correo directamente a
    alecoronadosiles@hotmail.com sin tocar los datos ellos mismos.
 
-## Permisos (sin contrasenas, simple)
+## Permisos (login real por rol)
 
-Cada persona se identifica eligiendo su nombre en el selector de arriba a la derecha (no hay
-login con password, es un esquema liviano para uso interno). Los roles se administran desde el
-boton "Usuarios" (solo lo ve un Admin):
+El login es por **rol** (cuenta compartida), no por persona: hay 5 cuentas fijas, cada una con su
+propio usuario y contraseña. Al entrar tambien se pide "tu nombre" (texto libre) para que el
+historial de cambios diga quien fue puntualmente (ej: "Juan (VP)").
 
-- **admin**: edita todo, borra proyectos, administra usuarios/roles. (Alessandro por defecto)
-- **editor**: puede editar proyectos y tildar etapas. Pensado para la VP y los Jefes.
-- **viewer**: solo puede ver el tablero y usar "Solicitar cambio". Gaston, Javier y Eliana
-  arrancan con este rol; un admin puede subirlos a "editor" cuando quieran desde el panel de
-  Usuarios.
+- **Desarrollador**: acceso total — crea/edita/borra proyectos y administra las 5 cuentas
+  (cambiar contraseña o email) desde el boton "Usuarios" (solo lo ve este rol).
+- **VP**, **Jefe Cartera**, **Jefe Soberano**, **Asesor Senior**: todos pueden crear y editar
+  cualquier proyecto (tildar etapas, cargar montos, fechas, notas), pero ninguno puede borrar
+  proyectos ni administrar cuentas — eso queda solo para Desarrollador.
 
-Nota de seguridad: como no hay contrasena, cualquiera que abra la app puede elegirse como "VP" en
-el selector. Esto es intencional para simplificar el uso diario del equipo, pero si mas adelante
-quieren algo mas estricto (login real con password), se puede agregar despues.
+Las contraseñas iniciales las genera `npm run seed` (aleatorias, se imprimen una sola vez por
+consola) o se pueden fijar de antemano con variables de entorno `INIT_PASSWORD_DESARROLLADOR`,
+`INIT_PASSWORD_VP`, `INIT_PASSWORD_JEFE_CARTERA`, `INIT_PASSWORD_JEFE_SOBERANO`,
+`INIT_PASSWORD_ASESOR_SENIOR`. Nunca se hardcodean en el repo (es publico). Hace falta ademas
+una variable `SESSION_SECRET` (ver `.env.example`) para firmar las sesiones.
 
 ## Estructura del proyecto
 
@@ -59,19 +61,21 @@ pao-app/
    Railway crea la base y define automaticamente la variable `DATABASE_URL` en el servicio.
 5. Entrar al servicio del backend (el que Railway creo desde GitHub) y en la pestana
    **Variables**, confirmar que `DATABASE_URL` este disponible (Railway lo conecta solo si el
-   Postgres esta en el mismo proyecto; si no, copiar el valor manualmente desde la base).
+   Postgres esta en el mismo proyecto; si no, copiar el valor manualmente desde la base). Agregar
+   tambien `SESSION_SECRET` con un valor random (ver `.env.example`) — sin esto el login no
+   funciona.
 6. Railway va a detectar `package.json` y correr `npm install` + `node server.js`
    automaticamente (ya incluye `railway.json` con esa configuracion).
-7. La primera vez, correr el seed para crear las tablas y cargar los 24 proyectos. Se puede hacer
-   desde la pestana **Shell/Console** del servicio en Railway con:
+7. La primera vez, correr el seed para crear las tablas, las 5 cuentas por rol y cargar los 24
+   proyectos. Se puede hacer desde la pestana **Shell/Console** del servicio en Railway con:
    ```
    npm run seed
    ```
-   (esto solo carga datos si la tabla esta vacia; para forzar una recarga completa,
-   `FORCE_RESEED=1 npm run seed`).
+   Esto imprime las contraseñas generadas para cada cuenta **una sola vez** — guardalas. Correrlo
+   de nuevo no pisa proyectos ya cargados (usar `FORCE_RESEED=1 npm run seed` para forzar una
+   recarga completa de proyectos); las cuentas que ya existan tampoco se tocan.
 8. Railway asigna una URL publica (Settings -> Networking -> Generate Domain). Esa es la direccion
-   que van a usar Alessandro, la VP, los Jefes, Gaston, Javier y Eliana desde cualquier
-   dispositivo.
+   que va a usar el equipo desde cualquier dispositivo, entrando con la cuenta de su rol.
 
 ## Correr en modo local (sin Postgres)
 

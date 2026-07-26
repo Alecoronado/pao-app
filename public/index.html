@@ -7,7 +7,35 @@
 <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-<div class="app-shell">
+
+<div class="login-screen" id="loginScreen">
+  <form class="login-card" id="loginForm">
+    <h1>PAO &middot; Seguimiento de Proyectos</h1>
+    <div class="modal-sub">Ingresá con la cuenta de tu rol.</div>
+    <div class="form-field">
+      <label>Usuario</label>
+      <select id="li_username">
+        <option value="desarrollador">Desarrollador</option>
+        <option value="vp">VP</option>
+        <option value="jefe_cartera">Jefe Cartera</option>
+        <option value="jefe_soberano">Jefe Soberano</option>
+        <option value="asesor_senior">Asesor Senior</option>
+      </select>
+    </div>
+    <div class="form-field">
+      <label>Contraseña</label>
+      <input type="password" id="li_password" required />
+    </div>
+    <div class="form-field">
+      <label>Tu nombre</label>
+      <input type="text" id="li_displayname" placeholder="Para identificarte en el historial" required />
+    </div>
+    <div class="login-error" id="loginError" style="display:none"></div>
+    <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;background:var(--navy);color:#fff">Entrar</button>
+  </form>
+</div>
+
+<div class="app-shell" id="appShell" style="display:none">
 
   <header class="topbar">
     <div>
@@ -17,11 +45,12 @@
     <div class="topbar-right">
       <div class="user-pill">
         &#128100;
-        <select id="userSelect"></select>
+        <span id="currentUserLabel">-</span>
         <span class="role-badge" id="roleBadge">-</span>
       </div>
       <button class="btn btn-outline" id="usersBtn" style="display:none">Usuarios</button>
       <button class="btn btn-primary" id="newProjectBtn" style="display:none">+ Nuevo proyecto</button>
+      <button class="btn btn-outline" id="logoutBtn">Cerrar sesión</button>
     </div>
   </header>
 

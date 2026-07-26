@@ -23,11 +23,22 @@ const PAIS_FLAGS = {
 const ESTADO_OPTIONS = ['SIN CARTA CONSULTA', 'CON CARTA CONSULTA', 'SEGUNDA ETAPA', 'APROBADO'];
 const GARANTIA_OPTIONS = ['Soberano', 'No Soberano'];
 const PROB_OPTIONS = ['A', 'B', 'C'];
+const ROLE_LABELS = {
+  desarrollador: 'Desarrollador',
+  vp: 'VP',
+  jefe_cartera: 'Jefe Cartera',
+  jefe_soberano: 'Jefe Soberano',
+  asesor_senior: 'Asesor Senior',
+};
+
+function loadAuth() {
+  try { return JSON.parse(localStorage.getItem('pao_auth') || 'null'); } catch (e) { return null; }
+}
 
 const state = {
   projects: [],
   users: [],
-  currentUserName: localStorage.getItem('pao_user_name') || '',
+  auth: loadAuth(), // { token, role, roleLabel, displayName }
   filters: { search: '', garantia: '', estado: '', prioridad: '', probabilidad: '', pais: '' },
   editingProject: null, // objeto en edicion (o {} para nuevo)
 };
@@ -35,8 +46,15 @@ const state = {
 // ---------------- API helpers ----------------
 async function api(path, opts = {}) {
   const headers = Object.assign({ 'Content-Type': 'application/json' }, opts.headers || {});
-  if (state.currentUserName) headers['x-user-name'] = state.currentUserName;
+  if (state.auth) {
+    headers['Authorization'] = `Bearer ${state.auth.token}`;
+    headers['x-display-name'] = state.auth.displayName;
+  }
   const res = await fetch(path, Object.assign({}, opts, { headers }));
+  if (res.status === 401) {
+    logout();
+    throw new Error('Tu sesión expiró. Volvé a entrar.');
+  }
   let data = null;
   try { data = await res.json(); } catch (e) { /* sin body */ }
   if (!res.ok) {
@@ -46,19 +64,27 @@ async function api(path, opts = {}) {
   return data;
 }
 
-function currentUserObj() {
-  return state.users.find((u) => u.name === state.currentUserName) || null;
-}
-function currentRole() {
-  const u = currentUserObj();
-  return u ? u.role : 'viewer';
-}
 function canEdit() {
-  const r = currentRole();
-  return r === 'admin' || r === 'editor';
+  return !!state.auth;
 }
-function isAdmin() {
-  return currentRole() === 'admin';
+function isDeveloper() {
+  return !!state.auth && state.auth.role === 'desarrollador';
+}
+
+function logout() {
+  state.auth = null;
+  localStorage.removeItem('pao_auth');
+  showLoginScreen();
+}
+
+function showLoginScreen() {
+  document.getElementById('loginScreen').style.display = 'flex';
+  document.getElementById('appShell').style.display = 'none';
+}
+
+function showAppShell() {
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('appShell').style.display = '';
 }
 
 // ---------------- Toast ----------------
@@ -88,11 +114,8 @@ function fmtFecha(iso) {
 
 // ---------------- Load data ----------------
 async function loadUsers() {
+  if (!isDeveloper()) return;
   state.users = await api('/api/users');
-  if (!state.currentUserName && state.users.length) {
-    state.currentUserName = state.users[0].name;
-  }
-  renderUserSelect();
 }
 
 async function loadProjects() {
@@ -115,16 +138,11 @@ async function loadSummary() {
 }
 
 // ---------------- Rendering: header / user ----------------
-function renderUserSelect() {
-  const sel = document.getElementById('userSelect');
-  sel.innerHTML = state.users.map((u) => `<option value="${u.name}">${u.name}</option>`).join('');
-  sel.value = state.currentUserName;
-  const role = currentRole();
-  const badge = document.getElementById('roleBadge');
-  const labelMap = { admin: 'Admin', editor: 'Editor', viewer: 'Consulta' };
-  badge.textContent = labelMap[role] || role;
+function renderUserBadge() {
+  document.getElementById('currentUserLabel').textContent = state.auth ? state.auth.displayName : '-';
+  document.getElementById('roleBadge').textContent = state.auth ? (state.auth.roleLabel || ROLE_LABELS[state.auth.role]) : '-';
   document.getElementById('newProjectBtn').style.display = canEdit() ? 'inline-flex' : 'none';
-  document.getElementById('usersBtn').style.display = isAdmin() ? 'inline-flex' : 'none';
+  document.getElementById('usersBtn').style.display = isDeveloper() ? 'inline-flex' : 'none';
 }
 
 // ---------------- Rendering: filters ----------------
@@ -212,7 +230,7 @@ function renderTable() {
         <td>
           <div class="row-actions">
             ${editable ? `<button class="icon-btn" data-action="edit" data-id="${p.id}" title="Editar">✏️</button>` : ''}
-            ${isAdmin() ? `<button class="icon-btn" data-action="delete" data-id="${p.id}" title="Eliminar">🗑️</button>` : ''}
+            ${isDeveloper() ? `<button class="icon-btn" data-action="delete" data-id="${p.id}" title="Eliminar">🗑️</button>` : ''}
           </div>
         </td>
       </tr>
@@ -261,7 +279,7 @@ function renderCards() {
         </div>
         <div class="pcard-actions">
           ${editable ? `<button class="btn btn-ghost btn-sm" data-action="edit" data-id="${p.id}">Editar</button>` : ''}
-          ${isAdmin() ? `<button class="btn btn-sm" style="background:#FCE4E4;color:#B0271B" data-action="delete" data-id="${p.id}">Eliminar</button>` : ''}
+          ${isDeveloper() ? `<button class="btn btn-sm" style="background:#FCE4E4;color:#B0271B" data-action="delete" data-id="${p.id}">Eliminar</button>` : ''}
         </div>
       </div>
     `;
@@ -495,26 +513,15 @@ async function confirmDelete(id) {
 }
 
 // ---------------- Modal: usuarios / roles ----------------
-function openUsersModal() {
+async function openUsersModal() {
   const root = document.getElementById('modalRoot');
-  const rolesOpts = ['viewer', 'editor', 'admin'];
   root.innerHTML = `
     <div class="modal-overlay" id="overlay">
       <div class="modal">
         <button class="close-x" id="closeModal">✕</button>
-        <h2>Usuarios y permisos</h2>
-        <div class="modal-sub">Admin: acceso total. Editor (VP / Jefes): puede editar proyectos. Consulta: solo puede ver y solicitar cambios.</div>
-        <div id="usersTableWrap"></div>
-        <div style="margin-top:16px;border-top:1px solid var(--border);padding-top:14px">
-          <div class="form-grid">
-            <div class="form-field"><label>Nombre</label><input id="nu_name" /></div>
-            <div class="form-field"><label>Email</label><input id="nu_email" /></div>
-            <div class="form-field"><label>Rol</label>
-              <select id="nu_role">${rolesOpts.map((r) => `<option value="${r}">${r}</option>`).join('')}</select>
-            </div>
-          </div>
-          <button class="btn btn-primary" id="addUserBtn" style="background:var(--navy);color:#fff;margin-top:10px">+ Agregar usuario</button>
-        </div>
+        <h2>Cuentas por rol</h2>
+        <div class="modal-sub">Desarrollador: acceso total. VP, Jefe Cartera, Jefe Soberano y Asesor Senior: editan proyectos pero no borran ni administran cuentas.</div>
+        <div id="usersTableWrap">Cargando...</div>
         <div class="modal-footer"><button class="btn btn-ghost" id="cancelModal">Cerrar</button></div>
       </div>
     </div>
@@ -524,45 +531,46 @@ function openUsersModal() {
     wrap.innerHTML = `<table style="width:100%;font-size:13px;border-collapse:collapse;margin-top:8px">
       ${state.users.map((u) => `
         <tr style="border-bottom:1px solid var(--border)">
-          <td style="padding:6px 4px">${u.name}</td>
-          <td style="padding:6px 4px;color:var(--muted)">${u.email || ''}</td>
+          <td style="padding:6px 4px;font-weight:600">${ROLE_LABELS[u.role] || u.role}</td>
+          <td style="padding:6px 4px;color:var(--muted)">
+            <input type="email" placeholder="email (opcional)" data-uid="${u.id}" class="email-input" value="${u.email || ''}" style="width:100%;border:1px solid var(--border);border-radius:6px;padding:5px 7px" />
+          </td>
           <td style="padding:6px 4px">
-            <select data-uid="${u.id}" class="role-select">
-              ${rolesOpts.map((r) => `<option value="${r}" ${u.role === r ? 'selected' : ''}>${r}</option>`).join('')}
-            </select>
+            <button class="btn btn-ghost btn-sm" data-uid="${u.id}" data-uname="${u.username}" data-action="reset-pw">Cambiar contraseña</button>
           </td>
         </tr>
       `).join('')}
     </table>`;
-    wrap.querySelectorAll('.role-select').forEach((sel) => {
-      sel.addEventListener('change', async () => {
+    wrap.querySelectorAll('.email-input').forEach((input) => {
+      input.addEventListener('change', async () => {
         try {
-          await api(`/api/users/${sel.dataset.uid}`, { method: 'PUT', body: JSON.stringify({ role: sel.value }) });
-          await loadUsers();
-          showToast('Rol actualizado.');
+          await api(`/api/users/${input.dataset.uid}`, { method: 'PUT', body: JSON.stringify({ email: input.value.trim() }) });
+          showToast('Email actualizado.');
+        } catch (e) { showToast(e.message); }
+      });
+    });
+    wrap.querySelectorAll('[data-action="reset-pw"]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const nueva = prompt(`Nueva contraseña para ${btn.dataset.uname}:`);
+        if (!nueva) return;
+        try {
+          await api(`/api/users/${btn.dataset.uid}`, { method: 'PUT', body: JSON.stringify({ password: nueva }) });
+          showToast('Contraseña actualizada.');
         } catch (e) { showToast(e.message); }
       });
     });
   };
-  renderUsersTable();
+
+  try {
+    await loadUsers();
+    renderUsersTable();
+  } catch (e) {
+    document.getElementById('usersTableWrap').textContent = e.message;
+  }
 
   document.getElementById('closeModal').addEventListener('click', closeModal);
   document.getElementById('cancelModal').addEventListener('click', closeModal);
   document.getElementById('overlay').addEventListener('click', (e) => { if (e.target.id === 'overlay') closeModal(); });
-  document.getElementById('addUserBtn').addEventListener('click', async () => {
-    const name = document.getElementById('nu_name').value.trim();
-    const email = document.getElementById('nu_email').value.trim();
-    const role = document.getElementById('nu_role').value;
-    if (!name) { showToast('Falta el nombre.'); return; }
-    try {
-      await api('/api/users', { method: 'POST', body: JSON.stringify({ name, email, role }) });
-      await loadUsers();
-      renderUsersTable();
-      document.getElementById('nu_name').value = '';
-      document.getElementById('nu_email').value = '';
-      showToast('Usuario agregado.');
-    } catch (e) { showToast(e.message); }
-  });
 }
 
 // ---------------- Modal: solicitar cambio (feedback por correo) ----------------
@@ -598,9 +606,10 @@ function openFeedbackModal() {
     const message = document.getElementById('fb_message').value.trim();
     if (!message) { showToast('Escribi el pedido antes de enviar.'); return; }
     const to = 'alecoronadosiles@hotmail.com';
-    const subject = `[PAO] Solicitud de cambio${project ? ' - ' + project : ''} (de ${state.currentUserName || 'usuario'})`;
+    const solicitante = state.auth ? `${state.auth.displayName} (${state.auth.roleLabel})` : 'usuario';
+    const subject = `[PAO] Solicitud de cambio${project ? ' - ' + project : ''} (de ${solicitante})`;
     const bodyLines = [
-      `Solicitante: ${state.currentUserName || '(sin identificar)'}`,
+      `Solicitante: ${solicitante}`,
       project ? `Proyecto: ${project}` : null,
       '',
       message,
@@ -612,14 +621,37 @@ function openFeedbackModal() {
   });
 }
 
+// ---------------- Login ----------------
+async function handleLoginSubmit(e) {
+  e.preventDefault();
+  const username = document.getElementById('li_username').value;
+  const password = document.getElementById('li_password').value;
+  const displayName = document.getElementById('li_displayname').value.trim();
+  const errorEl = document.getElementById('loginError');
+  errorEl.style.display = 'none';
+  if (!displayName) { errorEl.textContent = 'Escribí tu nombre.'; errorEl.style.display = 'block'; return; }
+  try {
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || `Error ${res.status}`);
+    state.auth = { token: data.token, role: data.role, roleLabel: data.roleLabel, displayName };
+    localStorage.setItem('pao_auth', JSON.stringify(state.auth));
+    document.getElementById('li_password').value = '';
+    await startApp();
+  } catch (e2) {
+    errorEl.textContent = e2.message;
+    errorEl.style.display = 'block';
+  }
+}
+
 // ---------------- Wiring general ----------------
 function wireStaticUi() {
-  document.getElementById('userSelect').addEventListener('change', (e) => {
-    state.currentUserName = e.target.value;
-    localStorage.setItem('pao_user_name', state.currentUserName);
-    renderUserSelect();
-    renderAll();
-  });
+  document.getElementById('loginForm').addEventListener('submit', handleLoginSubmit);
+  document.getElementById('logoutBtn').addEventListener('click', logout);
   document.getElementById('usersBtn').addEventListener('click', openUsersModal);
   document.getElementById('newProjectBtn').addEventListener('click', () => openEditModal(null));
   document.getElementById('feedbackFab').addEventListener('click', openFeedbackModal);
@@ -648,13 +680,23 @@ function wireStaticUi() {
   if (window.innerWidth <= 980) document.getElementById('filtersGrid').classList.add('collapsed');
 }
 
-async function init() {
-  wireStaticUi();
+async function startApp() {
+  renderUserBadge();
+  showAppShell();
   try {
     await loadUsers();
     await Promise.all([loadProjects(), loadSummary()]);
   } catch (e) {
     showToast('No se pudo conectar con el servidor: ' + e.message);
+  }
+}
+
+function init() {
+  wireStaticUi();
+  if (state.auth) {
+    startApp();
+  } else {
+    showLoginScreen();
   }
 }
 

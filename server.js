@@ -3,8 +3,11 @@ const express = require('express');
 const path = require('path');
 const pool = require('./db');
 const { STAGES, computeEtapaActual } = require('./db/stages');
+const { ROLE_SLUGS, ROLE_LABELS, isDeveloper } = require('./db/roles');
+const { hashPassword, verifyPassword, signToken, verifyToken } = require('./db/auth');
 
 const app = express();
+app.set('trust proxy', true); // Railway está detrás de un proxy; necesario para req.ip real (rate limit de login)
 app.use(express.json());
 
 const PROJECT_FIELDS = [
@@ -32,47 +35,97 @@ function withComputed(row) {
   };
 }
 
-// --- "login" liviano: identifica al usuario por header, sin contraseña ---
+// --- Login por rol: usuario/contraseña + token firmado (Authorization: Bearer) ---
 async function currentUser(req) {
-  const name = req.header('x-user-name');
-  if (!name) return null;
-  const { rows } = await pool.query('SELECT * FROM users WHERE name = $1', [name]);
-  return rows[0] || null;
+  const auth = req.header('authorization') || '';
+  const token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
+  if (!token) return null;
+  const payload = verifyToken(token);
+  if (!payload) return null;
+  const displayName = (req.header('x-display-name') || '').trim().slice(0, 60) || ROLE_LABELS[payload.role] || payload.role;
+  return { username: payload.username, role: payload.role, displayName };
 }
 
 function canEdit(user) {
-  return !!user && (user.role === 'admin' || user.role === 'editor');
+  return !!user;
 }
 
-// ---------- USERS ----------
-app.get('/api/users', async (req, res) => {
-  const { rows } = await pool.query('SELECT id, name, email, role FROM users ORDER BY id');
-  res.json(rows);
+function auditName(user) {
+  const label = ROLE_LABELS[user.role] || user.role;
+  return `${user.displayName} (${label})`;
+}
+
+// --- Rate limiting simple para /api/auth/login (en memoria, por ip+usuario) ---
+const loginAttempts = new Map();
+const MAX_ATTEMPTS = 8;
+const WINDOW_MS = 15 * 60 * 1000;
+
+function isRateLimited(key) {
+  const entry = loginAttempts.get(key);
+  if (!entry) return false;
+  if (Date.now() - entry.first > WINDOW_MS) {
+    loginAttempts.delete(key);
+    return false;
+  }
+  return entry.count >= MAX_ATTEMPTS;
+}
+function registerFailedAttempt(key) {
+  const entry = loginAttempts.get(key);
+  if (!entry || Date.now() - entry.first > WINDOW_MS) {
+    loginAttempts.set(key, { count: 1, first: Date.now() });
+  } else {
+    entry.count += 1;
+  }
+}
+function clearAttempts(key) {
+  loginAttempts.delete(key);
+}
+
+// ---------- AUTH ----------
+app.post('/api/auth/login', async (req, res) => {
+  const { username, password } = req.body || {};
+  if (!username || !password) return res.status(400).json({ error: 'Falta usuario o contraseña.' });
+  const key = `${req.ip}:${username}`;
+  if (isRateLimited(key)) {
+    return res.status(429).json({ error: 'Demasiados intentos fallidos. Probá de nuevo en unos minutos.' });
+  }
+  const { rows } = await pool.query('SELECT * FROM users WHERE username = $1', [username]);
+  const account = rows[0];
+  const ok = account && await verifyPassword(password, account.password_hash);
+  if (!ok) {
+    registerFailedAttempt(key);
+    return res.status(401).json({ error: 'Usuario o contraseña incorrectos.' });
+  }
+  clearAttempts(key);
+  const token = signToken({ username: account.username, role: account.role });
+  res.json({ token, role: account.role, roleLabel: ROLE_LABELS[account.role] || account.role });
 });
 
-app.post('/api/users', async (req, res) => {
+// ---------- USERS (gestión de cuentas, solo Desarrollador) ----------
+app.get('/api/users', async (req, res) => {
   const user = await currentUser(req);
-  if (!user || user.role !== 'admin') return res.status(403).json({ error: 'Solo un admin puede crear usuarios.' });
-  const { name, email, role } = req.body;
-  if (!name) return res.status(400).json({ error: 'Falta el nombre.' });
-  try {
-    const { rows } = await pool.query(
-      'INSERT INTO users (name, email, role) VALUES ($1,$2,$3) RETURNING id, name, email, role',
-      [name, email || null, role || 'viewer']
-    );
-    res.status(201).json(rows[0]);
-  } catch (e) {
-    res.status(400).json({ error: 'No se pudo crear el usuario (¿nombre repetido?).' });
-  }
+  if (!user || !isDeveloper(user.role)) return res.status(403).json({ error: 'Solo Desarrollador puede ver las cuentas.' });
+  const { rows } = await pool.query('SELECT id, username, email, role FROM users ORDER BY id');
+  res.json(rows);
 });
 
 app.put('/api/users/:id', async (req, res) => {
   const user = await currentUser(req);
-  if (!user || user.role !== 'admin') return res.status(403).json({ error: 'Solo un admin puede editar usuarios.' });
-  const { role, email } = req.body;
+  if (!user || !isDeveloper(user.role)) return res.status(403).json({ error: 'Solo Desarrollador puede editar cuentas.' });
+  const { email, password, role } = req.body || {};
+  if (role && !ROLE_SLUGS.includes(role)) return res.status(400).json({ error: 'Rol inválido.' });
+
+  const sets = [];
+  const params = [];
+  if (email !== undefined) { params.push(email || null); sets.push(`email = $${params.length}`); }
+  if (role) { params.push(role); sets.push(`role = $${params.length}`); }
+  if (password) { params.push(await hashPassword(password)); sets.push(`password_hash = $${params.length}`); }
+  if (!sets.length) return res.status(400).json({ error: 'Nada para actualizar.' });
+
+  params.push(req.params.id);
   const { rows } = await pool.query(
-    'UPDATE users SET role = COALESCE($1, role), email = COALESCE($2, email) WHERE id = $3 RETURNING id, name, email, role',
-    [role || null, email || null, req.params.id]
+    `UPDATE users SET ${sets.join(', ')} WHERE id = $${params.length} RETURNING id, username, email, role`,
+    params
   );
   if (!rows[0]) return res.status(404).json({ error: 'No encontrado.' });
   res.json(rows[0]);
@@ -141,7 +194,7 @@ app.post('/api/projects', async (req, res) => {
     }
   });
   cols.push('updated_by');
-  params.push(user.name);
+  params.push(auditName(user));
   placeholders.push(`$${params.length}`);
 
   const { rows } = await pool.query(
@@ -178,7 +231,7 @@ app.put('/api/projects/:id', async (req, res) => {
 
   if (sets.length === 0) return res.json(withComputed(existing));
 
-  params.push(user.name);
+  params.push(auditName(user));
   sets.push(`updated_by = $${params.length}`);
   sets.push('updated_at = now()');
   params.push(req.params.id);
@@ -191,7 +244,7 @@ app.put('/api/projects/:id', async (req, res) => {
   for (const [field, oldValue, newValue] of historyEntries) {
     await pool.query(
       'INSERT INTO project_history (project_id, field, old_value, new_value, changed_by) VALUES ($1,$2,$3,$4,$5)',
-      [req.params.id, field, oldValue, newValue, user.name]
+      [req.params.id, field, oldValue, newValue, auditName(user)]
     );
   }
 
@@ -200,7 +253,7 @@ app.put('/api/projects/:id', async (req, res) => {
 
 app.delete('/api/projects/:id', async (req, res) => {
   const user = await currentUser(req);
-  if (!user || user.role !== 'admin') return res.status(403).json({ error: 'Solo un admin puede borrar proyectos.' });
+  if (!user || !isDeveloper(user.role)) return res.status(403).json({ error: 'Solo Desarrollador puede borrar proyectos.' });
   await pool.query('DELETE FROM projects WHERE id = $1', [req.params.id]);
   res.status(204).end();
 });

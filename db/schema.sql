@@ -1,11 +1,30 @@
 -- PAO - Seguimiento de Proyectos
 -- Esquema PostgreSQL
 
+-- Migracion: la version anterior tenia usuarios por persona (name/email/role,
+-- sin contrasena). Si queda esa forma vieja, se tira la tabla para recrearla
+-- con el esquema de login por rol de abajo (proyectos/historial no se tocan).
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'users' AND column_name = 'name'
+  ) AND NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'users' AND column_name = 'username'
+  ) THEN
+    DROP TABLE users;
+  END IF;
+END $$;
+
+-- Login por rol (cuenta compartida por rol, no por persona).
+-- role: 'desarrollador' | 'vp' | 'jefe_cartera' | 'jefe_soberano' | 'asesor_senior'
 CREATE TABLE IF NOT EXISTS users (
   id            SERIAL PRIMARY KEY,
-  name          TEXT NOT NULL UNIQUE,
+  username      TEXT NOT NULL UNIQUE,
+  password_hash TEXT NOT NULL,
+  role          TEXT NOT NULL,
   email         TEXT,
-  role          TEXT NOT NULL DEFAULT 'viewer', -- 'admin' | 'editor' | 'viewer'
   created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 

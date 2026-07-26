@@ -1,16 +1,24 @@
 process.env.USE_PGLITE = '1';
+process.env.SESSION_SECRET = 'test-secret';
 const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
 
+const TEST_PASSWORD = 'test-pass-1234';
+
 async function main() {
   const pool = require('../db');
-  const { USERS, PROJECTS } = require('../db/seed-data');
+  const { PROJECTS } = require('../db/seed-data');
+  const { ROLES } = require('../db/roles');
   const { STAGES } = require('../db/stages');
+  const { hashPassword } = require('../db/auth');
 
   const schema = fs.readFileSync(path.join(__dirname, '..', 'db', 'schema.sql'), 'utf8');
   await pool.exec(schema);
-  for (const u of USERS) await pool.query('INSERT INTO users (name, email, role) VALUES ($1,$2,$3)', [u.name, u.email || null, u.role]);
+  for (const r of ROLES) {
+    const password_hash = await hashPassword(TEST_PASSWORD);
+    await pool.query('INSERT INTO users (username, password_hash, role) VALUES ($1,$2,$3)', [r.slug, password_hash, r.slug]);
+  }
   for (const p of PROJECTS) {
     const stageCols = STAGES.map((s) => s.key);
     const cols = ['garantia','codigo','pais','apodo','prioridad',...stageCols,'estado','probabilidad',
@@ -46,15 +54,23 @@ async function main() {
   assert.ok(js.includes('function init'));
   console.log('✔ GET /app.js OK (', js.length, 'bytes )');
 
-  r = await fetch(`${base}/api/users`);
+  r = await fetch(`${base}/api/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username: 'desarrollador', password: TEST_PASSWORD }),
+  });
+  assert.strictEqual(r.status, 200);
+  const { token } = await r.json();
+  console.log('✔ POST /api/auth/login OK');
+
+  r = await fetch(`${base}/api/users`, { headers: { Authorization: `Bearer ${token}` } });
   const users = await r.json();
   assert.strictEqual(users.length, 5);
-  console.log('✔ GET /api/users ->', users.map(u => `${u.name}(${u.role})`).join(', '));
+  console.log('✔ GET /api/users ->', users.map(u => `${u.username}(${u.role})`).join(', '));
 
   r = await fetch(`${base}/api/projects`);
   const projects = await r.json();
   assert.strictEqual(projects.length, 24);
-  // Chequeo visual rapido: todos los campos esperados presentes
   const p0 = projects[0];
   ['id','pais','apodo','estado','probabilidad','etapa_actual','monto_total','fecha_aprobacion'].forEach((k) => {
     assert.ok(k in p0, `falta campo ${k} en la respuesta de projects`);

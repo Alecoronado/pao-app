@@ -4,14 +4,6 @@
 const X = 'X';
 const NC = 'N/C';
 
-const USERS = [
-  { name: 'Alessandro', email: 'alecoronadosiles@hotmail.com', role: 'admin' },
-  { name: 'VP', email: '', role: 'editor' },
-  { name: 'Gastón', email: '', role: 'viewer' },
-  { name: 'Javier', email: '', role: 'viewer' },
-  { name: 'Eliana', email: '', role: 'viewer' },
-];
-
 const FECHA_REPORTE = '2026-05-30';
 
 const PROJECTS = [
@@ -89,4 +81,4 @@ const PROJECTS = [
     monto_total:30, aprob:[0,30,0,0], monto_aprobado:0, desem:[30,0,0,0] },
 ].map(p => ({ ...p, fecha_reporte: FECHA_REPORTE }));
 
-module.exports = { USERS, PROJECTS };
+module.exports = { PROJECTS };
