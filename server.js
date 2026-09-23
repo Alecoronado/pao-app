@@ -10,9 +10,12 @@ const app = express();
 app.set('trust proxy', true); // Railway está detrás de un proxy; necesario para req.ip real (rate limit de login)
 app.use(express.json());
 
+const STAGE_DATE_KEYS = STAGES.map((s) => `${s.key}_fecha`);
+
 const PROJECT_FIELDS = [
   'garantia', 'codigo', 'pais', 'apodo', 'prioridad',
   ...STAGES.map((s) => s.key),
+  ...STAGE_DATE_KEYS,
   'estado', 'probabilidad',
   'monto_total', 'aprob_2026', 'aprob_2027', 'aprob_2028', 'aprob_2029',
   'monto_aprobado', 'desem_2026', 'desem_2027', 'desem_2028', 'desem_2029',
@@ -27,12 +30,22 @@ function toDateStr(v) {
 }
 
 function withComputed(row) {
-  return {
+  const out = {
     ...row,
     fecha_reporte: toDateStr(row.fecha_reporte),
     fecha_aprobacion: toDateStr(row.fecha_aprobacion),
     etapa_actual: computeEtapaActual(row),
   };
+  STAGE_DATE_KEYS.forEach((k) => { out[k] = toDateStr(row[k]); });
+  return out;
+}
+
+// La fecha de una etapa solo aplica si la etapa esta realizada ('X'): si el body
+// cambia la etapa a otra cosa, se limpia su fecha.
+function normalizeStageDates(body) {
+  STAGES.forEach((s) => {
+    if (body[s.key] !== undefined && body[s.key] !== 'X') body[`${s.key}_fecha`] = null;
+  });
 }
 
 // --- Login por rol: usuario/contraseña + token firmado (Authorization: Bearer) ---
@@ -183,6 +196,7 @@ app.get('/api/projects/:id/history', async (req, res) => {
 app.post('/api/projects', async (req, res) => {
   const user = await currentUser(req);
   if (!canEdit(user)) return res.status(403).json({ error: 'No tenés permiso para crear proyectos.' });
+  normalizeStageDates(req.body);
 
   const cols = [];
   const placeholders = [];
@@ -208,6 +222,7 @@ app.post('/api/projects', async (req, res) => {
 app.put('/api/projects/:id', async (req, res) => {
   const user = await currentUser(req);
   if (!canEdit(user)) return res.status(403).json({ error: 'No tenés permiso para editar. Usá "Solicitar cambio".' });
+  normalizeStageDates(req.body);
 
   const { rows: existingRows } = await pool.query('SELECT * FROM projects WHERE id = $1', [req.params.id]);
   const existing = existingRows[0];
@@ -220,7 +235,7 @@ app.put('/api/projects/:id', async (req, res) => {
     if (req.body[f] !== undefined) {
       const newVal = req.body[f] === '' ? null : req.body[f];
       const oldVal = existing[f];
-      const oldStr = oldVal === null || oldVal === undefined ? '' : String(oldVal);
+      const oldStr = oldVal === null || oldVal === undefined ? '' : (oldVal instanceof Date ? toDateStr(oldVal) : String(oldVal));
       const newStr = newVal === null || newVal === undefined ? '' : String(newVal);
       if (oldStr !== newStr) {
         params.push(newVal);

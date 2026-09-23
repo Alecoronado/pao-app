@@ -166,6 +166,8 @@ table.pao-table tbody tr:hover { background: #F7F9FC; }
   border-radius: 5px; font-size: 11px; font-weight: 700; cursor: default;
 }
 .stage-mark.editable { cursor: pointer; }
+.stage-wrap { display: inline-flex; flex-direction: column; align-items: center; gap: 2px; }
+.stage-date { font-size: 9px; line-height: 1; color: var(--muted); white-space: nowrap; }
 .stage-mark.done { background: var(--stage-done); color: var(--stage-done-text); }
 .stage-mark.nc { background: var(--stage-nc); color: var(--stage-nc-text); font-size: 9px; }
 .stage-mark.pending { background: var(--stage-pending); color: var(--stage-pending-text); }
@@ -244,7 +246,11 @@ tfoot td {
   width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 7px; font-size: 13.5px;
 }
 .form-field textarea { resize: vertical; min-height: 60px; }
-.stage-editor { display: flex; flex-wrap: wrap; gap: 6px; }
+.stage-editor { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.stage-item { display: flex; flex-direction: column; gap: 4px; }
+.stage-item .stage-toggle { width: 100%; }
+.stage-item .stage-fecha { width: 100%; padding: 5px 6px; border: 1px solid var(--border); border-radius: 7px; font-size: 11.5px; }
+.stage-item .stage-fecha:disabled { opacity: .4; background: #F4F6FA; }
 .stage-editor button {
   border: 1px solid var(--border); border-radius: 7px; padding: 6px 9px; font-size: 11px; font-weight: 700;
   cursor: pointer; background: #fff; min-width: 62px;
@@ -292,6 +298,7 @@ tfoot td {
   .topbar { padding: 12px 14px; }
   .form-grid { grid-template-columns: 1fr; }
   .legend-grid { grid-template-columns: 1fr 1fr; }
+  .stage-editor { grid-template-columns: repeat(2, 1fr); }
 }
 @media (max-width: 520px) {
   .kpis { grid-template-columns: 1fr; }

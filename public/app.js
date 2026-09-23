@@ -108,6 +108,10 @@ function fmtMonto(n) {
   const v = Number(n || 0);
   return v.toLocaleString('es-AR', { maximumFractionDigits: 1 }) + ' M';
 }
+function fmtFechaCorta(iso) {
+  const [y, m, d] = iso.split('-');
+  return `${d}/${m}/${y.slice(2)}`;
+}
 function fmtFecha(iso) {
   if (!iso) return null;
   const [y, m, d] = iso.split('-');
@@ -197,7 +201,10 @@ function stageMarkHtml(project, stage, editable) {
   if (val === 'X') { cls = 'done'; label = '✓'; }
   else if (val === 'N/C') { cls = 'nc'; label = 'N/C'; }
   const editCls = editable ? 'editable' : '';
-  return `<span class="stage-mark ${cls} ${editCls}" data-project-id="${project.id}" data-stage="${stage.key}" title="${stage.label}">${label}</span>`;
+  const fecha = val === 'X' ? project[`${stage.key}_fecha`] : null;
+  const title = fecha ? `${stage.label} · realizada el ${fmtFecha(fecha)}` : stage.label;
+  const mark = `<span class="stage-mark ${cls} ${editCls}" data-project-id="${project.id}" data-stage="${stage.key}" title="${title}">${label}</span>`;
+  return `<span class="stage-wrap">${mark}${fecha ? `<span class="stage-date">${fmtFechaCorta(fecha)}</span>` : ''}</span>`;
 }
 
 function renderTable() {
@@ -335,7 +342,11 @@ function stageEditorHtml(project) {
   return STAGES.map((s) => {
     const val = project[s.key] || '';
     const label = val === 'X' ? 'X' : val === 'N/C' ? 'N/C' : '—';
-    return `<button type="button" class="stage-toggle" data-stage="${s.key}" data-val="${val}">${s.label}: ${label}</button>`;
+    const fecha = project[`${s.key}_fecha`] || '';
+    return `<div class="stage-item">
+      <button type="button" class="stage-toggle" data-stage="${s.key}" data-val="${val}">${s.label}: ${label}</button>
+      <input type="date" class="stage-fecha" data-stage="${s.key}" value="${fecha}" ${val === 'X' ? '' : 'disabled'} title="Fecha en que se realizó ${s.label}" />
+    </div>`;
   }).join('');
 }
 
@@ -376,7 +387,7 @@ function openEditModal(id, opts = {}) {
           <div class="form-field"><label>Fecha de reporte</label><input type="date" id="f_fecha_reporte" value="${project.fecha_reporte || ''}" /></div>
 
           <div class="form-field full">
-            <label>Etapas del proceso (click para alternar: pendiente / X / N-C)</label>
+            <label>Etapas del proceso (click para alternar: pendiente / X / N-C; al marcar X podés cargar la fecha)</label>
             <div class="stage-editor" id="stageEditor">${stageEditorHtml(project)}</div>
           </div>
 
@@ -422,6 +433,10 @@ function openEditModal(id, opts = {}) {
       btn.dataset.val = next;
       const stage = STAGES.find((s) => s.key === btn.dataset.stage);
       btn.textContent = `${stage.label}: ${next === 'X' ? 'X' : next === 'N/C' ? 'N/C' : '—'}`;
+      const dateInput = document.querySelector(`.stage-fecha[data-stage="${btn.dataset.stage}"]`);
+      dateInput.disabled = next !== 'X';
+      if (next !== 'X') dateInput.value = '';
+      else if (!dateInput.value) dateInput.value = new Date().toISOString().slice(0, 10);
     });
   });
 
@@ -485,6 +500,9 @@ async function saveProjectFromModal(isNew, id) {
   }
   document.querySelectorAll('.stage-toggle').forEach((btn) => {
     body[btn.dataset.stage] = btn.dataset.val || null;
+  });
+  document.querySelectorAll('.stage-fecha').forEach((inp) => {
+    body[`${inp.dataset.stage}_fecha`] = inp.disabled ? null : (inp.value || null);
   });
 
   try {

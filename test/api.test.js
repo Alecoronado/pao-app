@@ -105,6 +105,24 @@ async function main() {
   assert.ok(hist.some(h => h.field === 'monto_total' && h.changed_by === 'Juan (Analista VPO)'), 'debería quedar "Juan (Analista VPO)" en el historial');
   console.log('✔ historial de auditoría registra nombre + rol');
 
+  // --- Test: fecha por etapa (solo si la etapa esta en X) ---
+  r = await fetch(`${base}/api/projects/${fpiVialidad.id}`, {
+    method: 'PUT',
+    headers: authHeaders(analistaAuth.token, 'Juan'),
+    body: JSON.stringify({ stage_abs: 'X', stage_abs_fecha: '2026-03-15' }),
+  });
+  let withDate = await r.json();
+  assert.strictEqual(withDate.stage_abs, 'X');
+  assert.strictEqual(withDate.stage_abs_fecha, '2026-03-15', 'debería guardar la fecha de la etapa');
+  r = await fetch(`${base}/api/projects/${fpiVialidad.id}`, {
+    method: 'PUT',
+    headers: authHeaders(analistaAuth.token, 'Juan'),
+    body: JSON.stringify({ stage_abs: 'N/C' }),
+  });
+  withDate = await r.json();
+  assert.strictEqual(withDate.stage_abs_fecha, null, 'al sacar el X se limpia la fecha de la etapa');
+  console.log('✔ fecha por etapa: se guarda con X y se limpia al destildar');
+
   // --- Test: solo desarrollador puede borrar ---
   r = await fetch(`${base}/api/projects/${fpiVialidad.id}`, {
     method: 'DELETE',

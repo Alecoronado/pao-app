@@ -72,6 +72,16 @@ CREATE TABLE IF NOT EXISTS projects (
   created_at        TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- Fecha en que se completo cada etapa (solo tiene sentido si la etapa esta en 'X').
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS stage_abs_fecha     DATE;
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS stage_pp_pr_fecha   DATE;
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS stage_pp_cop_fecha  DATE;
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS stage_po_pr_fecha   DATE;
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS stage_vec_fecha     DATE;
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS stage_po_cop_fecha  DATE;
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS stage_neg_fecha     DATE;
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS stage_dej_fecha     DATE;
+
 -- Historial de cambios (auditoría simple para el CRM)
 CREATE TABLE IF NOT EXISTS project_history (
   id            SERIAL PRIMARY KEY,
