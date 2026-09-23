@@ -306,12 +306,54 @@ function attachStageHandlers(editable) {
       const project = state.projects.find((p) => String(p.id) === String(id));
       const cur = project[key];
       const next = cur === 'X' ? 'N/C' : cur === 'N/C' ? null : 'X';
+      const stage = STAGES.find((st) => st.key === key);
+      // Al marcar como realizada se pide la fecha (cancelar deja la etapa como estaba).
+      let body = { [key]: next };
+      if (next === 'X') {
+        const fecha = await askStageDate(project, stage);
+        if (fecha === undefined) return;
+        body[`${key}_fecha`] = fecha;
+      }
       try {
-        await api(`/api/projects/${id}`, { method: 'PUT', body: JSON.stringify({ [key]: next }) });
+        await api(`/api/projects/${id}`, { method: 'PUT', body: JSON.stringify(body) });
         await Promise.all([loadProjects(), loadSummary()]);
       } catch (e) {
         showToast(e.message);
       }
+    });
+  });
+}
+
+// Mini-modal para elegir la fecha de realizacion de una etapa.
+// Devuelve 'YYYY-MM-DD', null (sin fecha) o undefined (cancelado).
+function askStageDate(project, stage) {
+  return new Promise((resolve) => {
+    const root = document.getElementById('modalRoot');
+    const today = new Date().toISOString().slice(0, 10);
+    root.innerHTML = `
+      <div class="modal-overlay" id="overlay">
+        <div class="modal" style="max-width:380px">
+          <button class="close-x" id="closeModal">✕</button>
+          <h2>Etapa ${stage.label} realizada</h2>
+          <div class="modal-sub">${project.apodo}</div>
+          <div class="form-field">
+            <label>Fecha en que se realizó</label>
+            <input type="date" id="stageDateInput" value="${today}" />
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-ghost" id="cancelModal">Cancelar</button>
+            <button class="btn btn-ghost" id="noDateBtn">Sin fecha</button>
+            <button class="btn btn-primary" id="saveStageDate" style="background:var(--navy);color:#fff">Guardar</button>
+          </div>
+        </div>
+      </div>`;
+    const done = (value) => { closeModal(); resolve(value); };
+    document.getElementById('closeModal').addEventListener('click', () => done(undefined));
+    document.getElementById('cancelModal').addEventListener('click', () => done(undefined));
+    document.getElementById('overlay').addEventListener('click', (e) => { if (e.target.id === 'overlay') done(undefined); });
+    document.getElementById('noDateBtn').addEventListener('click', () => done(null));
+    document.getElementById('saveStageDate').addEventListener('click', () => {
+      done(document.getElementById('stageDateInput').value || null);
     });
   });
 }
