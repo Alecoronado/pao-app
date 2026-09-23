@@ -42,6 +42,7 @@ async function currentUser(req) {
   if (!token) return null;
   const payload = verifyToken(token);
   if (!payload) return null;
+  if (!ROLE_SLUGS.includes(payload.role)) return null; // rol eliminado -> sesión inválida
   const displayName = (req.header('x-display-name') || '').trim().slice(0, 60) || ROLE_LABELS[payload.role] || payload.role;
   return { username: payload.username, role: payload.role, displayName };
 }
@@ -90,7 +91,7 @@ app.post('/api/auth/login', async (req, res) => {
     return res.status(429).json({ error: 'Demasiados intentos fallidos. Probá de nuevo en unos minutos.' });
   }
   const { rows } = await pool.query('SELECT * FROM users WHERE username = $1', [username]);
-  const account = rows[0];
+  const account = rows[0] && ROLE_SLUGS.includes(rows[0].role) ? rows[0] : null;
   const ok = account && await verifyPassword(password, account.password_hash);
   if (!ok) {
     registerFailedAttempt(key);

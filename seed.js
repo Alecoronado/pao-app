@@ -13,24 +13,42 @@ function randomPassword() {
 }
 
 async function seedUsers() {
+  // 1) Borrar cuentas de roles que ya no existen (ej: jefe_cartera, asesor_senior).
+  const { rows: obsolete } = await pool.query(
+    'DELETE FROM users WHERE NOT (role = ANY($1::text[])) RETURNING username',
+    [ROLES.map((r) => r.slug)]
+  );
+  if (obsolete.length) {
+    console.log('Cuentas eliminadas (roles que ya no existen): ' + obsolete.map((u) => u.username).join(', '));
+  }
+
+  // 2) Crear las cuentas que falten. Con RESET_PASSWORDS=1 tambien se renueva la
+  //    contraseña de las que ya existen. En ambos casos se usa INIT_PASSWORD_<ROL>
+  //    si esta definida, y si no una aleatoria.
+  const reset = process.env.RESET_PASSWORDS === '1';
   const generated = [];
   for (const r of ROLES) {
     const { rows } = await pool.query('SELECT id FROM users WHERE username = $1', [r.slug]);
-    if (rows.length > 0) continue; // ya existe, no se pisa la contraseña
+    const exists = rows.length > 0;
+    if (exists && !reset) continue; // ya existe, no se pisa la contraseña
     const password = process.env[`INIT_PASSWORD_${r.slug.toUpperCase()}`] || randomPassword();
     const password_hash = await hashPassword(password);
-    await pool.query(
-      'INSERT INTO users (username, password_hash, role) VALUES ($1,$2,$3)',
-      [r.slug, password_hash, r.slug]
-    );
-    generated.push({ username: r.slug, label: r.label, password });
+    if (exists) {
+      await pool.query('UPDATE users SET password_hash = $1, role = $2 WHERE id = $3', [password_hash, r.slug, rows[0].id]);
+    } else {
+      await pool.query(
+        'INSERT INTO users (username, password_hash, role) VALUES ($1,$2,$3)',
+        [r.slug, password_hash, r.slug]
+      );
+    }
+    generated.push({ username: r.slug, label: r.label, password, action: exists ? 'renovada' : 'creada' });
   }
   if (generated.length) {
-    console.log('\nCuentas creadas (guardá estas contraseñas, no se vuelven a mostrar):');
-    generated.forEach((g) => console.log(`  ${g.label.padEnd(16)} usuario: ${g.username.padEnd(16)} contraseña: ${g.password}`));
+    console.log('\nCuentas creadas/renovadas (guardá estas contraseñas, no se vuelven a mostrar):');
+    generated.forEach((g) => console.log(`  ${g.label.padEnd(26)} usuario: ${g.username.padEnd(26)} contraseña: ${g.password}  (${g.action})`));
     console.log('');
   } else {
-    console.log('Las 5 cuentas de rol ya existían, no se generaron contraseñas nuevas.');
+    console.log(`Las ${ROLES.length} cuentas de rol ya existían, no se generaron contraseñas nuevas (usá RESET_PASSWORDS=1 para renovarlas).`);
   }
 }
 

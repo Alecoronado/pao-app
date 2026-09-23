@@ -26,9 +26,11 @@ const PROB_OPTIONS = ['A', 'B', 'C'];
 const ROLE_LABELS = {
   desarrollador: 'Desarrollador',
   vp: 'VP',
-  jefe_cartera: 'Jefe Cartera',
+  jefe_servicios_operativos: 'Jefe Servicios Operativos',
   jefe_soberano: 'Jefe Soberano',
-  asesor_senior: 'Asesor Senior',
+  jefe_no_soberano: 'Jefe No Soberano',
+  analista_vpo: 'Analista VPO',
+  gcr: 'GCR',
 };
 
 function loadAuth() {
@@ -520,7 +522,7 @@ async function openUsersModal() {
       <div class="modal">
         <button class="close-x" id="closeModal">✕</button>
         <h2>Cuentas por rol</h2>
-        <div class="modal-sub">Desarrollador: acceso total. VP, Jefe Cartera, Jefe Soberano y Asesor Senior: editan proyectos pero no borran ni administran cuentas.</div>
+        <div class="modal-sub">Desarrollador: acceso total. VP, Jefe Servicios Operativos, Jefe Soberano, Jefe No Soberano, Analista VPO y GCR: editan proyectos pero no borran ni administran cuentas.</div>
         <div id="usersTableWrap">Cargando...</div>
         <div class="modal-footer"><button class="btn btn-ghost" id="cancelModal">Cerrar</button></div>
       </div>

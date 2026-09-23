@@ -68,8 +68,8 @@ async function main() {
   assert.strictEqual(vpAuth.role, 'vp');
   const devAuth = await login('desarrollador');
   assert.strictEqual(devAuth.role, 'desarrollador');
-  const asesorAuth = await login('asesor_senior');
-  console.log('✔ login OK para vp, desarrollador, asesor_senior');
+  const analistaAuth = await login('analista_vpo');
+  console.log('✔ login OK para vp, desarrollador, analista_vpo');
 
   // --- Test: sin token no se puede editar ---
   r = await fetch(`${base}/api/projects`);
@@ -87,22 +87,22 @@ async function main() {
   assert.strictEqual(r.status, 403, 'sin sesión no debería poder editar');
   console.log('✔ sin sesión bloqueado al intentar editar (403)');
 
-  // --- Test: cualquier rol logueado puede editar (incl. asesor_senior) ---
+  // --- Test: cualquier rol logueado puede editar (incl. analista_vpo) ---
   r = await fetch(`${base}/api/projects/${fpiVialidad.id}`, {
     method: 'PUT',
-    headers: authHeaders(asesorAuth.token, 'Juan'),
+    headers: authHeaders(analistaAuth.token, 'Juan'),
     body: JSON.stringify({ monto_total: 999, fecha_aprobacion: '2026-08-15' }),
   });
-  assert.strictEqual(r.status, 200, 'asesor_senior debería poder editar');
+  assert.strictEqual(r.status, 200, 'analista_vpo debería poder editar');
   const updated = await r.json();
   assert.strictEqual(Number(updated.monto_total), 999);
   assert.strictEqual(updated.fecha_aprobacion, '2026-08-15');
-  console.log('✔ asesor_senior puede editar monto_total y fecha_aprobacion');
+  console.log('✔ analista_vpo puede editar monto_total y fecha_aprobacion');
 
   // --- Test: historial guarda "Nombre (Rol)" ---
   r = await fetch(`${base}/api/projects/${fpiVialidad.id}/history`);
   const hist = await r.json();
-  assert.ok(hist.some(h => h.field === 'monto_total' && h.changed_by === 'Juan (Asesor Senior)'), 'debería quedar "Juan (Asesor Senior)" en el historial');
+  assert.ok(hist.some(h => h.field === 'monto_total' && h.changed_by === 'Juan (Analista VPO)'), 'debería quedar "Juan (Analista VPO)" en el historial');
   console.log('✔ historial de auditoría registra nombre + rol');
 
   // --- Test: solo desarrollador puede borrar ---
@@ -126,9 +126,9 @@ async function main() {
   r = await fetch(`${base}/api/users`, { headers: authHeaders(devAuth.token, 'Alessandro') });
   assert.strictEqual(r.status, 200, 'desarrollador debería poder ver las cuentas');
   const users = await r.json();
-  assert.strictEqual(users.length, 5);
+  assert.strictEqual(users.length, ROLES.length);
   assert.ok(!('password_hash' in users[0]), 'no debería exponer password_hash');
-  console.log('✔ gestión de cuentas restringida a desarrollador (5 cuentas, sin password_hash)');
+  console.log('✔ gestión de cuentas restringida a desarrollador (%d cuentas, sin password_hash)', ROLES.length);
 
   // --- Test: etapa actual (punto 4 del pedido original) ---
   const ruta13 = projects.find(p => p.apodo.includes('RUTA 13'));

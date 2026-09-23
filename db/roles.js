@@ -1,10 +1,12 @@
-// Los 5 roles de la app. El login es por rol (cuenta compartida), no por persona.
+// Los 7 roles de la app. El login es por rol (cuenta compartida), no por persona.
 const ROLES = [
   { slug: 'desarrollador', label: 'Desarrollador' },
   { slug: 'vp', label: 'VP' },
-  { slug: 'jefe_cartera', label: 'Jefe Cartera' },
+  { slug: 'jefe_servicios_operativos', label: 'Jefe Servicios Operativos' },
   { slug: 'jefe_soberano', label: 'Jefe Soberano' },
-  { slug: 'asesor_senior', label: 'Asesor Senior' },
+  { slug: 'jefe_no_soberano', label: 'Jefe No Soberano' },
+  { slug: 'analista_vpo', label: 'Analista VPO' },
+  { slug: 'gcr', label: 'GCR' },
 ];
 
 const ROLE_SLUGS = ROLES.map((r) => r.slug);

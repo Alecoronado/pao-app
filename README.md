@@ -20,20 +20,21 @@ celular o en la compu, y los cambios quedan guardados para todos.
 
 ## Permisos (login real por rol)
 
-El login es por **rol** (cuenta compartida), no por persona: hay 5 cuentas fijas, cada una con su
+El login es por **rol** (cuenta compartida), no por persona: hay 7 cuentas fijas, cada una con su
 propio usuario y contraseña. Al entrar tambien se pide "tu nombre" (texto libre) para que el
 historial de cambios diga quien fue puntualmente (ej: "Juan (VP)").
 
-- **Desarrollador**: acceso total — crea/edita/borra proyectos y administra las 5 cuentas
+- **Desarrollador**: acceso total — crea/edita/borra proyectos y administra las 7 cuentas
   (cambiar contraseña o email) desde el boton "Usuarios" (solo lo ve este rol).
-- **VP**, **Jefe Cartera**, **Jefe Soberano**, **Asesor Senior**: todos pueden crear y editar
+- **VP**, **Jefe Servicios Operativos**, **Jefe Soberano**, **Jefe No Soberano**, **Analista VPO**,
+  **GCR**: todos pueden crear y editar
   cualquier proyecto (tildar etapas, cargar montos, fechas, notas), pero ninguno puede borrar
   proyectos ni administrar cuentas — eso queda solo para Desarrollador.
 
 Las contraseñas iniciales las genera `npm run seed` (aleatorias, se imprimen una sola vez por
 consola) o se pueden fijar de antemano con variables de entorno `INIT_PASSWORD_DESARROLLADOR`,
-`INIT_PASSWORD_VP`, `INIT_PASSWORD_JEFE_CARTERA`, `INIT_PASSWORD_JEFE_SOBERANO`,
-`INIT_PASSWORD_ASESOR_SENIOR`. Nunca se hardcodean en el repo (es publico). Hace falta ademas
+`INIT_PASSWORD_VP`, `INIT_PASSWORD_JEFE_SERVICIOS_OPERATIVOS`, `INIT_PASSWORD_JEFE_SOBERANO`,
+`INIT_PASSWORD_JEFE_NO_SOBERANO`, `INIT_PASSWORD_ANALISTA_VPO`, `INIT_PASSWORD_GCR`. Nunca se hardcodean en el repo (es publico). Hace falta ademas
 una variable `SESSION_SECRET` (ver `.env.example`) para firmar las sesiones.
 
 ## Estructura del proyecto
@@ -66,14 +67,16 @@ pao-app/
    funciona.
 6. Railway va a detectar `package.json` y correr `npm install` + `node server.js`
    automaticamente (ya incluye `railway.json` con esa configuracion).
-7. La primera vez, correr el seed para crear las tablas, las 5 cuentas por rol y cargar los 24
+7. La primera vez, correr el seed para crear las tablas, las 7 cuentas por rol y cargar los 24
    proyectos. Se puede hacer desde la pestana **Shell/Console** del servicio en Railway con:
    ```
    npm run seed
    ```
    Esto imprime las contraseñas generadas para cada cuenta **una sola vez** — guardalas. Correrlo
    de nuevo no pisa proyectos ya cargados (usar `FORCE_RESEED=1 npm run seed` para forzar una
-   recarga completa de proyectos); las cuentas que ya existan tampoco se tocan.
+   recarga completa de proyectos); las cuentas que ya existan tampoco se tocan salvo con `RESET_PASSWORDS=1`, que les asigna
+   una contraseña nueva (la de `INIT_PASSWORD_<ROL>` si esta definida). El seed tambien borra
+   las cuentas de roles que ya no existen.
 8. Railway asigna una URL publica (Settings -> Networking -> Generate Domain). Esa es la direccion
    que va a usar el equipo desde cualquier dispositivo, entrando con la cuenta de su rol.
 

@@ -65,7 +65,7 @@ async function main() {
 
   r = await fetch(`${base}/api/users`, { headers: { Authorization: `Bearer ${token}` } });
   const users = await r.json();
-  assert.strictEqual(users.length, 5);
+  assert.strictEqual(users.length, ROLES.length);
   console.log('✔ GET /api/users ->', users.map(u => `${u.username}(${u.role})`).join(', '));
 
   r = await fetch(`${base}/api/projects`);
