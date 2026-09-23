@@ -18,7 +18,7 @@ BEGIN
 END $$;
 
 -- Login por rol (cuenta compartida por rol, no por persona).
--- role: 'desarrollador' | 'vp' | 'jefe_cartera' | 'jefe_soberano' | 'asesor_senior'
+-- role: 'desarrollador' | 'vp' | 'jefe_servicios_operativos' | 'jefe_soberano' | 'jefe_no_soberano' | 'analista_vpo' | 'gcr'
 CREATE TABLE IF NOT EXISTS users (
   id            SERIAL PRIMARY KEY,
   username      TEXT NOT NULL UNIQUE,
